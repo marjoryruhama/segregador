@@ -249,6 +249,10 @@
           Remover linhas duplicadas
         </label>
         <label class="check-label" style="margin-top:.35rem">
+          <input type="checkbox" id="opt-date" checked />
+          Adicionar coluna de data
+        </label>
+        <label class="check-label" style="margin-top:.35rem">
           <input type="checkbox" id="opt-preview" checked />
           Mostrar prévia dos dados
         </label>
@@ -379,9 +383,16 @@
         const result = await parseFile(f);
         const rows = result.data.filter(r => Object.keys(r).some(k => r[k] !== ''));
         if (!columns) columns = result.meta.fields;
+
+        // Extrai data do nome do arquivo (YYYY-MM-DD, YYYYMMDD ou DD-MM-YYYY)
+        const dateFromName = extractDateFromFilename(f.name);
+        if (document.getElementById('opt-date').checked) {
+          rows.forEach(r => r['data_consolidacao'] = dateFromName || today());
+        }
+
         totalBefore += rows.length;
         allRows.push(...rows);
-        log(`   ✔ ${rows.length} linhas lidas`, 'ok');
+        log(`   ✔ ${rows.length} linhas lidas${dateFromName ? ' · data: ' + dateFromName : ''}`, 'ok');
       } catch(e) {
         log(`   ✘ Erro ao ler ${f.name}: ${e}`, 'err');
       }
@@ -404,9 +415,14 @@
 
     setProgress(95, 'Gerando arquivo…');
 
+    // Garante que data_consolidacao seja a última coluna
+    const outCols = document.getElementById('opt-date').checked
+      ? [...(columns || []).filter(c => c !== 'data_consolidacao'), 'data_consolidacao']
+      : columns;
+
     // Build CSV output
     const outSep = sep === 'auto' ? ';' : sep;
-    finalCSV = Papa.unparse(allRows, { delimiter: outSep, columns });
+    finalCSV = Papa.unparse(allRows, { delimiter: outSep, columns: outCols });
 
     log(`\n✅ Concluído! ${allRows.length} linhas no arquivo final.`, 'ok');
     setProgress(100, 'Pronto!');
@@ -455,6 +471,24 @@
     });
     html += '</tbody></table>';
     document.getElementById('preview-table').innerHTML = html;
+  }
+
+  // ── Date helpers ──────────────────────────────────
+  function today() {
+    return new Date().toLocaleDateString('pt-BR'); // DD/MM/YYYY
+  }
+
+  function extractDateFromFilename(name) {
+    // YYYY-MM-DD ou YYYY_MM_DD
+    let m = name.match(/(\d{4})[-_](\d{2})[-_](\d{2})/);
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+    // YYYYMMDD
+    m = name.match(/(\d{4})(\d{2})(\d{2})/);
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+    // DD-MM-YYYY ou DD_MM_YYYY
+    m = name.match(/(\d{2})[-_](\d{2})[-_](\d{4})/);
+    if (m) return `${m[1]}/${m[2]}/${m[3]}`;
+    return null;
   }
 
   // ── Download ───────────────────────────────────────
