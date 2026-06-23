@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Consolidador de CSVs</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f4f6f9;
+      color: #1e2230;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1565c0, #0d47a1);
+      color: #fff;
+      border-radius: 12px;
+      padding: 2rem 2.5rem;
+      margin-bottom: 2rem;
+    }
+
+    header h1 { font-size: 1.8rem; margin-bottom: .4rem; }
+    header p  { opacity: .85; font-size: .95rem; }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.75rem 2rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,.07);
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      color: #1565c0;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    /* steps */
+    .steps { counter-reset: step; list-style: none; }
+    .steps li {
+      counter-increment: step;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: .65rem 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .steps li:last-child { border-bottom: none; }
+    .steps li::before {
+      content: counter(step);
+      min-width: 28px;
+      height: 28px;
+      background: #1565c0;
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* code block */
+    .code-wrap {
+      position: relative;
+      margin-top: .5rem;
+    }
+
+    pre {
+      background: #0d1117;
+      color: #c9d1d9;
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      font-size: .85rem;
+      line-height: 1.65;
+      overflow-x: auto;
+      tab-size: 4;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: .6rem;
+      right: .6rem;
+      background: #1565c0;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: .3rem .8rem;
+      font-size: .75rem;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .copy-btn:hover { background: #0d47a1; }
+    .copy-btn.copied { background: #2e7d32; }
+
+    /* keyword coloring via CSS only */
+    .kw  { color: #ff7b72; }
+    .fn  { color: #d2a8ff; }
+    .st  { color: #a5d6ff; }
+    .cm  { color: #8b949e; font-style: italic; }
+    .nb  { color: #79c0ff; }
+
+    /* sep toggle */
+    .sep-toggle {
+      display: flex;
+      gap: .75rem;
+      margin-top: .75rem;
+      flex-wrap: wrap;
+    }
+    .sep-toggle label {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      cursor: pointer;
+      background: #f0f4ff;
+      border: 2px solid #c7d7f5;
+      border-radius: 8px;
+      padding: .45rem 1rem;
+      font-size: .9rem;
+      transition: border-color .2s, background .2s;
+    }
+    .sep-toggle input[type=radio] { accent-color: #1565c0; }
+    .sep-toggle label:has(input:checked) {
+      border-color: #1565c0;
+      background: #e3eeff;
+      font-weight: 600;
+    }
+
+    /* table */
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th {
+      background: #e8f0fe;
+      color: #1565c0;
+      padding: .6rem 1rem;
+      text-align: left;
+    }
+    td { padding: .55rem 1rem; border-bottom: 1px solid #f0f0f0; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafbff; }
+
+    .badge {
+      display: inline-block;
+      background: #e8f0fe;
+      color: #1565c0;
+      border-radius: 4px;
+      padding: .15rem .5rem;
+      font-size: .8rem;
+      font-family: monospace;
+    }
+
+    footer {
+      text-align: center;
+      color: #888;
+      font-size: .8rem;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>📂 Consolidador de Arquivos CSV</h1>
+    <p>Script Python para unir múltiplos CSVs em um único arquivo final.</p>
+  </header>
+
+  <!-- Separator selector -->
+  <div class="card">
+    <h2>⚙️ Separador dos seus arquivos</h2>
+    <p style="font-size:.9rem;color:#555;margin-bottom:.5rem">
+      Selecione o separador usado nos seus CSVs. O código abaixo será atualizado automaticamente.
+    </p>
+    <div class="sep-toggle">
+      <label><input type="radio" name="sep" value=";" checked /> Ponto e vírgula &nbsp;<code>;</code></label>
+      <label><input type="radio" name="sep" value="," /> Vírgula &nbsp;<code>,</code></label>
+    </div>
+  </div>
+
+  <!-- Code block -->
+  <div class="card">
+    <h2>🐍 Script Python</h2>
+    <div class="code-wrap">
+      <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+      <pre id="code-block"><span class="kw">import</span> glob
+<span class="kw">import</span> pandas <span class="kw">as</span> pd
+
+<span class="cm"># Encontra todos os arquivos .csv na pasta atual</span>
+arquivos_csv = <span class="fn">glob</span>.glob(<span class="st">"*.csv"</span>)
+
+<span class="kw">if not</span> arquivos_csv:
+    <span class="nb">print</span>(<span class="st">"Nenhum arquivo .csv encontrado na pasta."</span>)
+    <span class="nb">exit</span>()
+
+<span class="nb">print</span>(<span class="fn">f</span><span class="st">"<span class="nb">{len(arquivos_csv)}</span> arquivo(s) encontrado(s): <span class="nb">{arquivos_csv}</span>"</span>)
+
+<span class="cm"># Lê cada arquivo e empilha em uma lista de DataFrames</span>
+dataframes = [
+    pd.<span class="fn">read_csv</span>(f, sep=<span class="st" id="sep-value">";"</span>, encoding=<span class="st">"utf-8"</span>, on_bad_lines=<span class="st">"skip"</span>)
+    <span class="kw">for</span> f <span class="kw">in</span> arquivos_csv
+]
+
+<span class="cm"># Concatena todos os DataFrames verticalmente</span>
+df_consolidado = pd.<span class="fn">concat</span>(dataframes, ignore_index=<span class="nb">True</span>)
+
+<span class="nb">print</span>(<span class="fn">f</span><span class="st">"Total de linhas antes da deduplicação: <span class="nb">{len(df_consolidado)}</span>"</span>)
+
+<span class="cm"># Remove linhas completamente duplicadas</span>
+df_consolidado.<span class="fn">drop_duplicates</span>(inplace=<span class="nb">True</span>)
+
+<span class="nb">print</span>(<span class="fn">f</span><span class="st">"Total de linhas após a deduplicação:  <span class="nb">{len(df_consolidado)}</span>"</span>)
+
+<span class="cm"># Exporta o resultado final (index=False omite o índice do pandas)</span>
+df_consolidado.<span class="fn">to_csv</span>(
+    <span class="st">"dados_consolidados.csv"</span>,
+    sep=<span class="st" id="sep-value2">";"</span>,
+    index=<span class="nb">False</span>,
+    encoding=<span class="st">"utf-8"</span>
+)
+
+<span class="nb">print</span>(<span class="st">"Arquivo 'dados_consolidados.csv' gerado com sucesso."</span>)</pre>
+    </div>
+  </div>
+
+  <!-- How to run -->
+  <div class="card">
+    <h2>🚀 Como executar</h2>
+    <ul class="steps">
+      <li>Instale a dependência: <div class="code-wrap" style="margin-top:.4rem"><pre style="padding:.6rem 1rem">pip install pandas</pre></div></li>
+      <li>Salve o script como <span class="badge">consolidar_csvs.py</span> na <strong>mesma pasta</strong> dos seus arquivos CSV.</li>
+      <li>Abra o terminal nessa pasta.</li>
+      <li>Execute o script: <div class="code-wrap" style="margin-top:.4rem"><pre style="padding:.6rem 1rem">python consolidar_csvs.py</pre></div></li>
+      <li>O arquivo <span class="badge">dados_consolidados.csv</span> será criado na mesma pasta.</li>
+    </ul>
+  </div>
+
+  <!-- What each step does -->
+  <div class="card">
+    <h2>📋 O que cada etapa faz</h2>
+    <table>
+      <thead>
+        <tr><th>Função</th><th>O que acontece</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="badge">glob.glob("*.csv")</span></td><td>Lista todos os CSVs na pasta atual</td></tr>
+        <tr><td><span class="badge">pd.read_csv(...)</span></td><td>Lê e carrega cada CSV em memória</td></tr>
+        <tr><td><span class="badge">pd.concat(...)</span></td><td>Empilha todos os DataFrames em um só</td></tr>
+        <tr><td><span class="badge">drop_duplicates()</span></td><td>Remove linhas completamente idênticas</td></tr>
+        <tr><td><span class="badge">to_csv(...)</span></td><td>Salva o resultado final em disco</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer>Gerado para uso com Python 3.8+ e pandas 1.3+</footer>
+
+</div>
+
+<script>
+  // Update sep value in code when radio changes
+  document.querySelectorAll('input[name="sep"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const val = `"${radio.value}"`;
+      document.getElementById('sep-value').textContent  = val;
+      document.getElementById('sep-value2').textContent = val;
+    });
+  });
+
+  // Copy plain text from the pre block
+  function copyCode(btn) {
+    const pre = document.getElementById('code-block');
+    navigator.clipboard.writeText(pre.innerText).then(() => {
+      btn.textContent = 'Copiado!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copiar'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+</script>
+</body>
+</html>
