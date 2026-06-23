@@ -4,7 +4,47 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Consolidador de CSVs</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script>
+  // Minimal CSV parser — no external dependencies
+  const Papa = {
+    parse(text, opts = {}) {
+      const sep = opts.delimiter || autoDetectSep(text);
+      const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+      const fields = splitLine(lines[0], sep);
+      const data = [];
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const vals = splitLine(lines[i], sep);
+        const row = {};
+        fields.forEach((f, j) => row[f] = vals[j] ?? '');
+        if (Object.values(row).some(v => v !== '')) data.push(row);
+      }
+      return { data, meta: { fields } };
+    },
+    unparse(data, opts = {}) {
+      if (!data.length) return '';
+      const sep = opts.delimiter || ';';
+      const cols = opts.columns || Object.keys(data[0]);
+      const esc = v => { const s = String(v ?? ''); return s.includes(sep)||s.includes('"')||s.includes('\n') ? `"${s.replace(/"/g,'""')}"` : s; };
+      return [cols.map(esc).join(sep), ...data.map(r => cols.map(c => esc(r[c])).join(sep))].join('\n');
+    }
+  };
+  function autoDetectSep(text) {
+    const line = text.split('\n')[0];
+    return (line.match(/;/g)||[]).length >= (line.match(/,/g)||[]).length ? ';' : ',';
+  }
+  function splitLine(line, sep) {
+    const res = []; let cur = ''; let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+      else if (ch === sep && !inQ) { res.push(cur.trim()); cur = ''; }
+      else cur += ch;
+    }
+    res.push(cur.trim());
+    return res;
+  }
+  </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -449,14 +489,15 @@
 
   function parseFile(file) {
     return new Promise((resolve, reject) => {
-      const detectedSep = sep === 'auto' ? undefined : sep;
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        delimiter: detectedSep,
-        complete: resolve,
-        error: reject,
-      });
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const detectedSep = sep === 'auto' ? undefined : sep;
+          resolve(Papa.parse(e.target.result, { delimiter: detectedSep }));
+        } catch(err) { reject(err); }
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(file, 'UTF-8');
     });
   }
 
