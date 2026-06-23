@@ -4,290 +4,468 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Consolidador de CSVs</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: 'Segoe UI', system-ui, sans-serif;
-      background: #f4f6f9;
+      background: #f0f4ff;
       color: #1e2230;
       min-height: 100vh;
       padding: 2rem 1rem;
     }
 
-    .container {
-      max-width: 860px;
-      margin: 0 auto;
-    }
+    .container { max-width: 780px; margin: 0 auto; }
 
     header {
       background: linear-gradient(135deg, #1565c0, #0d47a1);
       color: #fff;
-      border-radius: 12px;
+      border-radius: 16px;
       padding: 2rem 2.5rem;
-      margin-bottom: 2rem;
+      margin-bottom: 1.75rem;
     }
-
-    header h1 { font-size: 1.8rem; margin-bottom: .4rem; }
-    header p  { opacity: .85; font-size: .95rem; }
+    header h1 { font-size: 1.7rem; margin-bottom: .3rem; }
+    header p  { opacity: .8; font-size: .95rem; }
 
     .card {
       background: #fff;
+      border-radius: 14px;
+      padding: 1.75rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 2px 10px rgba(0,0,0,.07);
+    }
+    .card h2 { font-size: 1rem; color: #1565c0; margin-bottom: 1rem; }
+
+    /* ── Drop Zone ── */
+    #drop-zone {
+      border: 2.5px dashed #90aee8;
       border-radius: 12px;
-      padding: 1.75rem 2rem;
-      margin-bottom: 1.5rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,.07);
+      background: #f5f8ff;
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: background .2s, border-color .2s;
     }
+    #drop-zone.drag-over {
+      background: #e3eeff;
+      border-color: #1565c0;
+    }
+    #drop-zone .icon { font-size: 3rem; margin-bottom: .75rem; }
+    #drop-zone p { color: #555; font-size: .95rem; }
+    #drop-zone strong { color: #1565c0; }
+    #file-input { display: none; }
 
-    .card h2 {
-      font-size: 1.1rem;
-      color: #1565c0;
-      margin-bottom: 1rem;
+    /* ── File list ── */
+    #file-list { list-style: none; margin-top: 1rem; }
+    #file-list li {
       display: flex;
       align-items: center;
-      gap: .5rem;
-    }
-
-    /* steps */
-    .steps { counter-reset: step; list-style: none; }
-    .steps li {
-      counter-increment: step;
-      display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-      padding: .65rem 0;
-      border-bottom: 1px solid #f0f0f0;
-    }
-    .steps li:last-child { border-bottom: none; }
-    .steps li::before {
-      content: counter(step);
-      min-width: 28px;
-      height: 28px;
-      background: #1565c0;
-      color: #fff;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: .8rem;
-      font-weight: 700;
-      flex-shrink: 0;
-      margin-top: 2px;
-    }
-
-    /* code block */
-    .code-wrap {
-      position: relative;
-      margin-top: .5rem;
-    }
-
-    pre {
-      background: #0d1117;
-      color: #c9d1d9;
+      justify-content: space-between;
+      background: #f5f8ff;
+      border: 1px solid #dce7fb;
       border-radius: 8px;
-      padding: 1.25rem 1.5rem;
-      font-size: .85rem;
-      line-height: 1.65;
-      overflow-x: auto;
-      tab-size: 4;
+      padding: .55rem 1rem;
+      margin-bottom: .5rem;
+      font-size: .9rem;
+      animation: fadeIn .25s ease;
     }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(-4px) } to { opacity:1; transform:none } }
+    #file-list li .name { display: flex; align-items: center; gap: .5rem; }
+    #file-list li button {
+      background: none; border: none; cursor: pointer;
+      color: #c0392b; font-size: 1.1rem; line-height: 1;
+    }
+    #file-list li button:hover { color: #96281b; }
 
-    .copy-btn {
-      position: absolute;
-      top: .6rem;
-      right: .6rem;
+    /* ── Options ── */
+    .options-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+      align-items: flex-end;
+    }
+    .opt-group { display: flex; flex-direction: column; gap: .35rem; }
+    .opt-group label { font-size: .8rem; color: #555; font-weight: 600; }
+    .sep-btns { display: flex; gap: .5rem; }
+    .sep-btn {
+      padding: .4rem .9rem;
+      border: 2px solid #c7d7f5;
+      border-radius: 8px;
+      background: #f5f8ff;
+      cursor: pointer;
+      font-size: .9rem;
+      transition: all .15s;
+    }
+    .sep-btn.active {
+      border-color: #1565c0;
+      background: #e3eeff;
+      color: #1565c0;
+      font-weight: 700;
+    }
+    .check-label {
+      display: flex; align-items: center; gap: .45rem;
+      font-size: .9rem; cursor: pointer; user-select: none;
+    }
+    .check-label input { accent-color: #1565c0; width: 16px; height: 16px; }
+
+    /* ── Run button ── */
+    #btn-run {
+      width: 100%;
+      padding: .9rem;
       background: #1565c0;
       color: #fff;
       border: none;
-      border-radius: 6px;
-      padding: .3rem .8rem;
-      font-size: .75rem;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s, opacity .2s;
+    }
+    #btn-run:hover:not(:disabled) { background: #0d47a1; }
+    #btn-run:disabled { opacity: .45; cursor: not-allowed; }
+
+    /* ── Progress ── */
+    #progress-wrap { display: none; margin-top: 1rem; }
+    #progress-bar-track {
+      background: #e0e7ff;
+      border-radius: 99px;
+      height: 8px;
+      overflow: hidden;
+      margin-bottom: .4rem;
+    }
+    #progress-bar {
+      height: 100%;
+      background: #1565c0;
+      border-radius: 99px;
+      width: 0%;
+      transition: width .3s;
+    }
+    #progress-label { font-size: .8rem; color: #555; text-align: center; }
+
+    /* ── Result ── */
+    #result-card { display: none; }
+    .result-stats {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+    .stat {
+      flex: 1;
+      min-width: 130px;
+      background: #f5f8ff;
+      border: 1px solid #dce7fb;
+      border-radius: 10px;
+      padding: .85rem 1rem;
+      text-align: center;
+    }
+    .stat .num { font-size: 1.6rem; font-weight: 700; color: #1565c0; }
+    .stat .lbl { font-size: .78rem; color: #666; margin-top: .2rem; }
+
+    #btn-download {
+      width: 100%;
+      padding: .9rem;
+      background: #2e7d32;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
       cursor: pointer;
       transition: background .2s;
     }
-    .copy-btn:hover { background: #0d47a1; }
-    .copy-btn.copied { background: #2e7d32; }
+    #btn-download:hover { background: #1b5e20; }
 
-    /* keyword coloring via CSS only */
-    .kw  { color: #ff7b72; }
-    .fn  { color: #d2a8ff; }
-    .st  { color: #a5d6ff; }
-    .cm  { color: #8b949e; font-style: italic; }
-    .nb  { color: #79c0ff; }
-
-    /* sep toggle */
-    .sep-toggle {
-      display: flex;
-      gap: .75rem;
-      margin-top: .75rem;
-      flex-wrap: wrap;
-    }
-    .sep-toggle label {
-      display: flex;
-      align-items: center;
-      gap: .4rem;
-      cursor: pointer;
-      background: #f0f4ff;
-      border: 2px solid #c7d7f5;
-      border-radius: 8px;
-      padding: .45rem 1rem;
-      font-size: .9rem;
-      transition: border-color .2s, background .2s;
-    }
-    .sep-toggle input[type=radio] { accent-color: #1565c0; }
-    .sep-toggle label:has(input:checked) {
-      border-color: #1565c0;
-      background: #e3eeff;
-      font-weight: 600;
-    }
-
-    /* table */
-    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    /* ── Preview table ── */
+    #preview-wrap { margin-top: 1.25rem; overflow-x: auto; display: none; }
+    #preview-wrap p { font-size: .8rem; color: #888; margin-bottom: .5rem; }
+    table { width: 100%; border-collapse: collapse; font-size: .82rem; }
     th {
-      background: #e8f0fe;
-      color: #1565c0;
-      padding: .6rem 1rem;
-      text-align: left;
+      background: #e8f0fe; color: #1565c0;
+      padding: .45rem .75rem; text-align: left;
+      white-space: nowrap;
     }
-    td { padding: .55rem 1rem; border-bottom: 1px solid #f0f0f0; }
+    td { padding: .4rem .75rem; border-bottom: 1px solid #f0f0f0; white-space: nowrap; }
     tr:last-child td { border-bottom: none; }
-    tr:hover td { background: #fafbff; }
 
-    .badge {
-      display: inline-block;
-      background: #e8f0fe;
-      color: #1565c0;
-      border-radius: 4px;
-      padding: .15rem .5rem;
+    /* ── Log ── */
+    #log {
+      background: #0d1117;
+      color: #8b949e;
+      border-radius: 8px;
+      padding: .9rem 1.1rem;
       font-size: .8rem;
       font-family: monospace;
-    }
-
-    footer {
-      text-align: center;
-      color: #888;
-      font-size: .8rem;
+      line-height: 1.7;
       margin-top: 1rem;
+      max-height: 160px;
+      overflow-y: auto;
+      display: none;
     }
+    #log .ok  { color: #3fb950; }
+    #log .err { color: #f85149; }
+    #log .inf { color: #58a6ff; }
+
+    footer { text-align: center; color: #aaa; font-size: .78rem; margin-top: 1.5rem; }
   </style>
 </head>
 <body>
 <div class="container">
 
   <header>
-    <h1>📂 Consolidador de Arquivos CSV</h1>
-    <p>Script Python para unir múltiplos CSVs em um único arquivo final.</p>
+    <h1>📂 Consolidador de CSVs</h1>
+    <p>Importe seus arquivos, configure as opções e baixe o resultado em segundos.</p>
   </header>
 
-  <!-- Separator selector -->
+  <!-- Drop zone -->
   <div class="card">
-    <h2>⚙️ Separador dos seus arquivos</h2>
-    <p style="font-size:.9rem;color:#555;margin-bottom:.5rem">
-      Selecione o separador usado nos seus CSVs. O código abaixo será atualizado automaticamente.
-    </p>
-    <div class="sep-toggle">
-      <label><input type="radio" name="sep" value=";" checked /> Ponto e vírgula &nbsp;<code>;</code></label>
-      <label><input type="radio" name="sep" value="," /> Vírgula &nbsp;<code>,</code></label>
+    <h2>1 · Importe os arquivos CSV</h2>
+    <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="icon">📁</div>
+      <p><strong>Clique aqui</strong> ou arraste os arquivos para esta área</p>
+      <p style="font-size:.82rem;margin-top:.4rem;color:#888">Formatos aceitos: .csv</p>
+    </div>
+    <input type="file" id="file-input" multiple accept=".csv" />
+    <ul id="file-list"></ul>
+  </div>
+
+  <!-- Options -->
+  <div class="card">
+    <h2>2 · Configure as opções</h2>
+    <div class="options-row">
+      <div class="opt-group">
+        <label>Separador</label>
+        <div class="sep-btns">
+          <button class="sep-btn active" data-sep=";">Ponto e vírgula &nbsp; <code>;</code></button>
+          <button class="sep-btn" data-sep=",">,&nbsp; Vírgula</button>
+          <button class="sep-btn" data-sep="auto">🔍 Auto-detectar</button>
+        </div>
+      </div>
+      <div class="opt-group">
+        <label>Outras opções</label>
+        <label class="check-label">
+          <input type="checkbox" id="opt-dedup" checked />
+          Remover linhas duplicadas
+        </label>
+        <label class="check-label" style="margin-top:.35rem">
+          <input type="checkbox" id="opt-preview" checked />
+          Mostrar prévia dos dados
+        </label>
+      </div>
     </div>
   </div>
 
-  <!-- Code block -->
+  <!-- Run -->
   <div class="card">
-    <h2>🐍 Script Python</h2>
-    <div class="code-wrap">
-      <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
-      <pre id="code-block"><span class="kw">import</span> glob
-<span class="kw">import</span> pandas <span class="kw">as</span> pd
+    <h2>3 · Consolidar</h2>
+    <button id="btn-run" disabled>Selecione pelo menos um arquivo para continuar</button>
+    <div id="progress-wrap">
+      <div id="progress-bar-track"><div id="progress-bar"></div></div>
+      <div id="progress-label">Processando…</div>
+    </div>
+    <div id="log"></div>
+  </div>
 
-<span class="cm"># Encontra todos os arquivos .csv na pasta atual</span>
-arquivos_csv = <span class="fn">glob</span>.glob(<span class="st">"*.csv"</span>)
-
-<span class="kw">if not</span> arquivos_csv:
-    <span class="nb">print</span>(<span class="st">"Nenhum arquivo .csv encontrado na pasta."</span>)
-    <span class="nb">exit</span>()
-
-<span class="nb">print</span>(<span class="fn">f</span><span class="st">"<span class="nb">{len(arquivos_csv)}</span> arquivo(s) encontrado(s): <span class="nb">{arquivos_csv}</span>"</span>)
-
-<span class="cm"># Lê cada arquivo e empilha em uma lista de DataFrames</span>
-dataframes = [
-    pd.<span class="fn">read_csv</span>(f, sep=<span class="st" id="sep-value">";"</span>, encoding=<span class="st">"utf-8"</span>, on_bad_lines=<span class="st">"skip"</span>)
-    <span class="kw">for</span> f <span class="kw">in</span> arquivos_csv
-]
-
-<span class="cm"># Concatena todos os DataFrames verticalmente</span>
-df_consolidado = pd.<span class="fn">concat</span>(dataframes, ignore_index=<span class="nb">True</span>)
-
-<span class="nb">print</span>(<span class="fn">f</span><span class="st">"Total de linhas antes da deduplicação: <span class="nb">{len(df_consolidado)}</span>"</span>)
-
-<span class="cm"># Remove linhas completamente duplicadas</span>
-df_consolidado.<span class="fn">drop_duplicates</span>(inplace=<span class="nb">True</span>)
-
-<span class="nb">print</span>(<span class="fn">f</span><span class="st">"Total de linhas após a deduplicação:  <span class="nb">{len(df_consolidado)}</span>"</span>)
-
-<span class="cm"># Exporta o resultado final (index=False omite o índice do pandas)</span>
-df_consolidado.<span class="fn">to_csv</span>(
-    <span class="st">"dados_consolidados.csv"</span>,
-    sep=<span class="st" id="sep-value2">";"</span>,
-    index=<span class="nb">False</span>,
-    encoding=<span class="st">"utf-8"</span>
-)
-
-<span class="nb">print</span>(<span class="st">"Arquivo 'dados_consolidados.csv' gerado com sucesso."</span>)</pre>
+  <!-- Result -->
+  <div class="card" id="result-card">
+    <h2>✅ Resultado</h2>
+    <div class="result-stats">
+      <div class="stat"><div class="num" id="stat-files">-</div><div class="lbl">Arquivos lidos</div></div>
+      <div class="stat"><div class="num" id="stat-rows-before">-</div><div class="lbl">Linhas brutas</div></div>
+      <div class="stat"><div class="num" id="stat-dupes">-</div><div class="lbl">Duplicatas removidas</div></div>
+      <div class="stat"><div class="num" id="stat-rows-after">-</div><div class="lbl">Linhas finais</div></div>
+    </div>
+    <button id="btn-download">⬇️ Baixar dados_consolidados.csv</button>
+    <div id="preview-wrap">
+      <p>Prévia — primeiras 10 linhas:</p>
+      <div id="preview-table"></div>
     </div>
   </div>
 
-  <!-- How to run -->
-  <div class="card">
-    <h2>🚀 Como executar</h2>
-    <ul class="steps">
-      <li>Instale a dependência: <div class="code-wrap" style="margin-top:.4rem"><pre style="padding:.6rem 1rem">pip install pandas</pre></div></li>
-      <li>Salve o script como <span class="badge">consolidar_csvs.py</span> na <strong>mesma pasta</strong> dos seus arquivos CSV.</li>
-      <li>Abra o terminal nessa pasta.</li>
-      <li>Execute o script: <div class="code-wrap" style="margin-top:.4rem"><pre style="padding:.6rem 1rem">python consolidar_csvs.py</pre></div></li>
-      <li>O arquivo <span class="badge">dados_consolidados.csv</span> será criado na mesma pasta.</li>
-    </ul>
-  </div>
-
-  <!-- What each step does -->
-  <div class="card">
-    <h2>📋 O que cada etapa faz</h2>
-    <table>
-      <thead>
-        <tr><th>Função</th><th>O que acontece</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><span class="badge">glob.glob("*.csv")</span></td><td>Lista todos os CSVs na pasta atual</td></tr>
-        <tr><td><span class="badge">pd.read_csv(...)</span></td><td>Lê e carrega cada CSV em memória</td></tr>
-        <tr><td><span class="badge">pd.concat(...)</span></td><td>Empilha todos os DataFrames em um só</td></tr>
-        <tr><td><span class="badge">drop_duplicates()</span></td><td>Remove linhas completamente idênticas</td></tr>
-        <tr><td><span class="badge">to_csv(...)</span></td><td>Salva o resultado final em disco</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <footer>Gerado para uso com Python 3.8+ e pandas 1.3+</footer>
-
+  <footer>Tudo processado localmente no seu navegador — nenhum dado é enviado para servidores.</footer>
 </div>
 
 <script>
-  // Update sep value in code when radio changes
-  document.querySelectorAll('input[name="sep"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      const val = `"${radio.value}"`;
-      document.getElementById('sep-value').textContent  = val;
-      document.getElementById('sep-value2').textContent = val;
+  // ── State ──────────────────────────────────────────
+  let files = [];
+  let sep = ';';
+  let finalCSV = '';
+
+  // ── Drop zone ──────────────────────────────────────
+  const zone = document.getElementById('drop-zone');
+
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    addFiles([...e.dataTransfer.files]);
+  });
+
+  document.getElementById('file-input').addEventListener('change', e => {
+    addFiles([...e.target.files]);
+    e.target.value = '';
+  });
+
+  function addFiles(newFiles) {
+    newFiles.filter(f => f.name.endsWith('.csv')).forEach(f => {
+      if (!files.find(x => x.name === f.name && x.size === f.size)) files.push(f);
+    });
+    renderFileList();
+  }
+
+  function renderFileList() {
+    const ul = document.getElementById('file-list');
+    ul.innerHTML = '';
+    files.forEach((f, i) => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <span class="name">📄 ${f.name} <span style="color:#aaa;font-size:.8rem">(${(f.size/1024).toFixed(1)} KB)</span></span>
+        <button title="Remover" onclick="removeFile(${i})">✕</button>`;
+      ul.appendChild(li);
+    });
+    const btn = document.getElementById('btn-run');
+    btn.disabled = files.length === 0;
+    btn.textContent = files.length > 0
+      ? `▶ Consolidar ${files.length} arquivo${files.length > 1 ? 's' : ''}`
+      : 'Selecione pelo menos um arquivo para continuar';
+  }
+
+  function removeFile(i) { files.splice(i, 1); renderFileList(); }
+
+  // ── Separator buttons ──────────────────────────────
+  document.querySelectorAll('.sep-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.sep-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      sep = btn.dataset.sep;
     });
   });
 
-  // Copy plain text from the pre block
-  function copyCode(btn) {
-    const pre = document.getElementById('code-block');
-    navigator.clipboard.writeText(pre.innerText).then(() => {
-      btn.textContent = 'Copiado!';
-      btn.classList.add('copied');
-      setTimeout(() => { btn.textContent = 'Copiar'; btn.classList.remove('copied'); }, 2000);
+  // ── Log ────────────────────────────────────────────
+  function log(msg, type = 'inf') {
+    const el = document.getElementById('log');
+    el.style.display = 'block';
+    el.innerHTML += `<span class="${type}">${msg}</span>\n`;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  // ── Progress ───────────────────────────────────────
+  function setProgress(pct, label) {
+    document.getElementById('progress-bar').style.width = pct + '%';
+    document.getElementById('progress-label').textContent = label;
+  }
+
+  // ── Main consolidation ─────────────────────────────
+  document.getElementById('btn-run').addEventListener('click', async () => {
+    document.getElementById('log').innerHTML = '';
+    document.getElementById('log').style.display = 'block';
+    document.getElementById('result-card').style.display = 'none';
+    document.getElementById('progress-wrap').style.display = 'block';
+    document.getElementById('btn-run').disabled = true;
+    setProgress(0, 'Iniciando…');
+
+    let allRows = [];
+    let columns = null;
+    let totalBefore = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      setProgress(Math.round((i / files.length) * 80), `Lendo ${f.name}…`);
+      log(`📄 Lendo: ${f.name}`);
+
+      try {
+        const result = await parseFile(f);
+        const rows = result.data.filter(r => Object.keys(r).some(k => r[k] !== ''));
+        if (!columns) columns = result.meta.fields;
+        totalBefore += rows.length;
+        allRows.push(...rows);
+        log(`   ✔ ${rows.length} linhas lidas`, 'ok');
+      } catch(e) {
+        log(`   ✘ Erro ao ler ${f.name}: ${e}`, 'err');
+      }
+    }
+
+    setProgress(85, 'Concatenando…');
+    log(`\n📊 Total bruto: ${totalBefore} linhas`);
+
+    let rowsBefore = allRows.length;
+    if (document.getElementById('opt-dedup').checked) {
+      const seen = new Set();
+      allRows = allRows.filter(r => {
+        const key = JSON.stringify(r);
+        if (seen.has(key)) return false;
+        seen.add(key); return true;
+      });
+      const removed = rowsBefore - allRows.length;
+      log(`🗑 Duplicatas removidas: ${removed}`, removed > 0 ? 'inf' : 'ok');
+    }
+
+    setProgress(95, 'Gerando arquivo…');
+
+    // Build CSV output
+    const outSep = sep === 'auto' ? ';' : sep;
+    finalCSV = Papa.unparse(allRows, { delimiter: outSep, columns });
+
+    log(`\n✅ Concluído! ${allRows.length} linhas no arquivo final.`, 'ok');
+    setProgress(100, 'Pronto!');
+
+    // Stats
+    document.getElementById('stat-files').textContent = files.length;
+    document.getElementById('stat-rows-before').textContent = totalBefore.toLocaleString();
+    document.getElementById('stat-dupes').textContent = (totalBefore - allRows.length).toLocaleString();
+    document.getElementById('stat-rows-after').textContent = allRows.length.toLocaleString();
+
+    // Preview
+    const previewWrap = document.getElementById('preview-wrap');
+    if (document.getElementById('opt-preview').checked && allRows.length > 0) {
+      previewWrap.style.display = 'block';
+      renderPreview(columns, allRows.slice(0, 10));
+    } else {
+      previewWrap.style.display = 'none';
+    }
+
+    document.getElementById('result-card').style.display = 'block';
+    document.getElementById('result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('btn-run').disabled = false;
+  });
+
+  function parseFile(file) {
+    return new Promise((resolve, reject) => {
+      const detectedSep = sep === 'auto' ? undefined : sep;
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        delimiter: detectedSep,
+        complete: resolve,
+        error: reject,
+      });
     });
   }
+
+  function renderPreview(cols, rows) {
+    let html = '<table><thead><tr>';
+    cols.forEach(c => html += `<th>${c}</th>`);
+    html += '</tr></thead><tbody>';
+    rows.forEach(r => {
+      html += '<tr>';
+      cols.forEach(c => html += `<td>${r[c] ?? ''}</td>`);
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    document.getElementById('preview-table').innerHTML = html;
+  }
+
+  // ── Download ───────────────────────────────────────
+  document.getElementById('btn-download').addEventListener('click', () => {
+    const blob = new Blob(['﻿' + finalCSV], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'dados_consolidados.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
 </script>
 </body>
 </html>
